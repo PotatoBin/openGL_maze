@@ -16,8 +16,6 @@ void undo();
 void redo();
 void createModel();
 void mouse(int button, int state, int x, int y);
-bool hasOverlapWithLeftLines(const scrPt& p1, const scrPt& p2);
-
 void keyboard(unsigned char key, int x, int y);
 
 // 외부에서 접근 가능한 변수 선언
