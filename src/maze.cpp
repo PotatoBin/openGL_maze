@@ -139,6 +139,8 @@ void generateMaze() {
     std::uniform_int_distribution<> dis(1, mazeSize - 2);
 
     items.clear(); // 아이템 리스트 초기화
+    game.countItem = 0; // 획득한 아이템 수 초기화
+    game.isClear = false; // 게임 클리어 상태 초기화
 
     while (items.size() < static_cast<size_t>(itemCount)) {
         int i = dis(gen);
@@ -205,10 +207,13 @@ bool isColliding(float x, float z) {
                     // 플레이어와 벽 중심 간의 거리 계산
                     float dx = x - wallCenterX;
                     float dz = z - wallCenterZ;
-                    float distance = sqrtf(dx * dx + dz * dz);
 
-                    // 벽과 플레이어의 충돌 여부 확인
-                    if (distance < playerRadius + (maze.cellSize / 2.0f)) {
+                    // x 및 z 방향에서의 최소 거리 계산
+                    float overlapX = (playerRadius + maze.cellSize / 2.0f) - fabs(dx);
+                    float overlapZ = (playerRadius + maze.cellSize / 2.0f) - fabs(dz);
+
+                    // 충돌 여부 확인
+                    if (overlapX > 0 && overlapZ > 0) {
                         return true;
                     }
                 }
@@ -224,23 +229,13 @@ void initGame(void) {
     glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
     glEnable(GL_DEPTH_TEST);
 
-    // 조명 설정
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
+    // 기존 조명 설정 제거
+    // glEnable(GL_LIGHTING);
+    // glEnable(GL_LIGHT0);
 
-    GLfloat ambientLight[] = { 0.5f, 0.5f, 0.5f, 1.0f }; // 주변광 (강조)
-    GLfloat diffuseLight[] = { 0.7f, 0.7f, 0.7f, 1.0f }; // 확산광
-    GLfloat specularLight[] = { 0.9f, 0.9f, 0.9f, 1.0f }; // 반사광
-    GLfloat lightPosition[] = { 0.0f, 10.0f, 0.0f, 1.0f }; // 조명 위치 (위에서 비추는 빛)
-
-    glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-
-    // 색상 재질 사용
-    glEnable(GL_COLOR_MATERIAL);
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+    // 색상 재질 사용 제거
+    // glEnable(GL_COLOR_MATERIAL);
+    // glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
 
     // 쉐이딩 모드 설정
     glShadeModel(GL_SMOOTH);
@@ -248,9 +243,9 @@ void initGame(void) {
     // 깊이 테스트 설정
     glEnable(GL_DEPTH_TEST);
 
-    // 그림자 효과를 위해 블렌딩 활성화
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // 그림자 효과를 위해 블렌딩 활성화 제거
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 // 키보드 상태 추적을 위한 전역 변수
@@ -340,7 +335,7 @@ void renderText(float x, float y, const std::string& text, void* font = GLUT_BIT
     glColor3f(0.0f, 0.0f, 0.0f);
 
     // 텍스트 시작 위치 설정
-    glRasterPos2f(x, y); 
+    glRasterPos2f(x, y);
     for (char c : text) {
         glutBitmapCharacter(font, c);
     }
@@ -373,7 +368,25 @@ void displayGameWindow(void) {
 
     // 카메라 틸트 감쇠
     cameraTiltIntensity *= 0.9f; // 감쇠율
-    
+
+    // 플레이어 위치에 따라다니는 조명 설정
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+
+    GLfloat ambientLight[] = { 0.2f, 0.2f, 0.2f, 1.0f }; // 주변광 (약하게)
+    GLfloat diffuseLight[] = { 0.8f, 0.8f, 0.8f, 1.0f }; // 확산광
+    GLfloat specularLight[] = { 1.0f, 1.0f, 1.0f, 1.0f }; // 반사광
+    GLfloat lightPosition[] = { player.x, player.y + 1.0f, player.z, 1.0f }; // 플레이어 머리 위에 조명 위치
+
+    glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+    // 색상 재질 사용
+    glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+
     // 바닥 그리기
     glPushMatrix();
     glColor3f(0.2f, 0.2f, 0.2f); // 바닥은 어두운 회색
@@ -422,9 +435,6 @@ void displayGameWindow(void) {
         // 모델 크기 조정
         glScalef(1.0f, 1.0f, 1.0f);
 
-        // 조명 활성화
-        glEnable(GL_LIGHTING);
-
         // 모델 색상 설정 (연한 하늘색)
         glColor3f(0.53f, 0.81f, 0.98f); // 연한 하늘색
 
@@ -433,6 +443,26 @@ void displayGameWindow(void) {
 
         glPopMatrix();
     }
+
+    // 출구 표시
+    glPushMatrix();
+    float exitX = (game.exitgridX + 0.5f) * maze.cellSize;
+    float exitZ = (game.exitgridZ + 0.5f) * maze.cellSize;
+    float exitY = 0.5f; // 출구 표시의 높이
+
+    glTranslatef(exitX, exitY, exitZ);
+
+    // 아이템을 모두 모았는지에 따라 색상 변경
+    if (game.countItem == items.size()) {
+        glColor3f(0.0f, 1.0f, 0.0f); // 초록색 (탈출 가능)
+    }
+    else {
+        glColor3f(1.0f, 1.0f, 0.0f); // 노란색 (아이템 미수집)
+    }
+
+    glutSolidSphere(0.3f, 20, 20); // 출구에 구를 그려 표시
+
+    glPopMatrix();
 
     // 획득한 아이템 개수 텍스트
     std::ostringstream oss;
@@ -552,16 +582,25 @@ void update(int value) {
         cameraTiltIntensity = 0.5f; // 이동 시 카메라 틸트
     }
 
-    // 축별로 이동 및 충돌 검사
-    float tentativeX = player.x + moveX;
-    if (!isColliding(tentativeX, player.z)) {
-        player.x = tentativeX;
-    }
+    // 새로운 위치 계산
+    float newX = player.x + moveX;
+    float newZ = player.z + moveZ;
 
-    float tentativeZ = player.z + moveZ;
-    if (!isColliding(player.x, tentativeZ)) {
-        player.z = tentativeZ;
+    bool collisionX = isColliding(newX, player.z);
+    bool collisionZ = isColliding(player.x, newZ);
+
+    // 충돌 처리: 벽에 미끄러지듯 이동
+    if (!collisionX && !collisionZ) {
+        player.x = newX;
+        player.z = newZ;
     }
+    else if (!collisionX && collisionZ) {
+        player.x = newX;
+    }
+    else if (collisionX && !collisionZ) {
+        player.z = newZ;
+    }
+    // else: 두 축 모두 충돌하면 이동하지 않음
 
     // 점프 및 중력 처리
     if (!player.onGround) {
@@ -594,15 +633,22 @@ void update(int value) {
 
     // 클리어 확인
     if (!game.isClear) {
-
         // 목표 지점의 그리드 위치에 대한 월드 좌표
         float exitX = (game.exitgridX + 0.5f) * maze.cellSize;
         float exitZ = (game.exitgridZ + 0.5f) * maze.cellSize;
 
-        // 목표 지점에 가까이 가면 클리어
+        // 목표 지점에 가까이 가면 클리어 조건 검사
         if (fabs(player.x - exitX) < 0.3f && fabs(player.z - exitZ) < 0.3f) {
-            std::cout << "클리어" << std::endl;
-            game.isClear = true;
+            if (game.countItem == items.size()) {
+                std::cout << "클리어" << std::endl;
+                game.isClear = true;
+            }
+            else {
+                // 아이템을 모두 모으지 못했을 경우
+                std::cout << "모든 아이템을 모아야 합니다!" << std::endl;
+                // 안내 메시지를 화면에 표시
+                renderText(glutGet(GLUT_WINDOW_WIDTH) / 2 - 100, glutGet(GLUT_WINDOW_HEIGHT) / 2, "Collect all items before exiting!", GLUT_BITMAP_TIMES_ROMAN_24);
+            }
         }
     }
 
