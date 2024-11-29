@@ -34,11 +34,12 @@ extern int gameWindow;
 // 모델러 전용 전역 변수 선언
 extern Rect undoButton;
 extern Rect redoButton;
-extern Rect gameStartButton;
+extern Rect axisToggleButton;
 extern Rect difficultyDecreaseButton;
 extern Rect difficultyIncreaseButton;
 extern Rect angleDecreaseButton;
 extern Rect angleIncreaseButton;
+extern Rect buildOrGameStartButton;
 
 extern std::vector<scrPt> leftPoints;
 extern std::vector<scrPt> rightPoints;
@@ -51,6 +52,11 @@ extern int angleValueIndex;
 extern int numAngleValues;
 
 extern int difficultyLevel;
+extern char revolvingAxis; // 'Y' 또는 'X'
+
+extern bool isModelBuilt; // 모델이 생성되었는지 여부
+
+extern std::vector<std::vector<scrPt>> rotatedPoints; // 회전된 점들 저장
 
 // 함수 선언
 void initModeler();
@@ -63,5 +69,6 @@ void keyboardModeler(unsigned char key, int x, int y);
 void undo();
 void redo();
 void createModel();
+void clearModel();
 
 #endif

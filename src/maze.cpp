@@ -229,14 +229,6 @@ void initGame(void) {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 배경을 검정색으로 설정
     glEnable(GL_DEPTH_TEST);
 
-    // 기존 조명 설정 제거
-    // glEnable(GL_LIGHTING);
-    // glEnable(GL_LIGHT0);
-
-    // 색상 재질 사용 제거
-    // glEnable(GL_COLOR_MATERIAL);
-    // glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-
     // 쉐이딩 모드 설정
     glShadeModel(GL_SMOOTH);
 
@@ -316,7 +308,7 @@ float cameraTiltOffset = 0.0f;
 float cameraTiltIntensity = 0.0f;
 
 // 화면에 텍스트를 렌더링하는 함수
-void renderText(float x, float y, const std::string& text, void* font = GLUT_BITMAP_HELVETICA_18) {
+void renderText(float x, float y, const std::string& text, void* font = GLUT_BITMAP_HELVETICA_18, float r = 1.0f, float g = 1.0f, float b = 1.0f) {
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -328,7 +320,7 @@ void renderText(float x, float y, const std::string& text, void* font = GLUT_BIT
 
     glDisable(GL_LIGHTING); // 조명 끄기
     glDisable(GL_DEPTH_TEST); // 깊이 테스트 끄기
-    glColor3f(1.0f, 1.0f, 1.0f); // 흰색 텍스트
+    glColor3f(r, g, b); // 지정된 색상으로 텍스트 렌더링
 
     // 텍스트 시작 위치 설정
     glRasterPos2f(x, y);
@@ -406,9 +398,9 @@ void displayGameWindow(void) {
     glBegin(GL_QUADS);
     glNormal3f(0.0f, 1.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(maze.cellSize * maze.mazeData[0].size(), 0.0f, 0.0f);
-    glVertex3f(maze.cellSize * maze.mazeData[0].size(), 0.0f, maze.cellSize * maze.mazeData.size());
-    glVertex3f(0.0f, 0.0f, maze.cellSize * maze.mazeData.size());
+    glVertex3f(static_cast<float>(maze.cellSize * maze.mazeData[0].size()), 0.0f, 0.0f); // 수정: static_cast<float> 사용
+    glVertex3f(static_cast<float>(maze.cellSize * maze.mazeData[0].size()), 0.0f, static_cast<float>(maze.cellSize * maze.mazeData.size())); // 수정
+    glVertex3f(0.0f, 0.0f, static_cast<float>(maze.cellSize * maze.mazeData.size())); // 수정
     glEnd();
     glPopMatrix();
 
@@ -416,8 +408,8 @@ void displayGameWindow(void) {
     glColor3f(0.7f, 0.7f, 0.7f); // 벽은 약간 더 밝은 회색
     float wallHeight = 2.0f;
 
-    for (int i = 0; i < maze.mazeData.size(); ++i) {
-        for (int j = 0; j < maze.mazeData[0].size(); ++j) {
+    for (size_t i = 0; i < maze.mazeData.size(); ++i) { // 수정: size_t 사용
+        for (size_t j = 0; j < maze.mazeData[0].size(); ++j) { // 수정
             if (maze.mazeData[i][j] == 1) { // 벽 셀
                 glPushMatrix();
                 glTranslatef((j + 0.5f) * maze.cellSize, wallHeight / 2.0f, (i + 0.5f) * maze.cellSize);
@@ -488,7 +480,8 @@ void displayGameWindow(void) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // 색상과 깊이 버퍼 초기화
         glLoadIdentity(); // 기존 모델뷰 행렬 초기화
 
-        renderText(glutGet(GLUT_WINDOW_WIDTH) / 2 - 50, glutGet(GLUT_WINDOW_HEIGHT) / 2, "Game Clear!", GLUT_BITMAP_TIMES_ROMAN_24);
+        // 텍스트 색상을 검은색으로 변경하여 보이도록 설정
+        renderText(glutGet(GLUT_WINDOW_WIDTH) / 2 - 50, glutGet(GLUT_WINDOW_HEIGHT) / 2, "Game Clear!", GLUT_BITMAP_TIMES_ROMAN_24, 0.0f, 0.0f, 0.0f);
         glutSwapBuffers();
         return;
     }
@@ -660,7 +653,7 @@ void update(int value) {
                 // 아이템을 모두 모으지 못했을 경우
                 std::cout << "모든 아이템을 모아야 합니다!" << std::endl;
                 // 안내 메시지를 화면에 표시
-                renderText(glutGet(GLUT_WINDOW_WIDTH) / 2 - 100, glutGet(GLUT_WINDOW_HEIGHT) / 2, "Collect all items before exiting!", GLUT_BITMAP_TIMES_ROMAN_24);
+                renderText(glutGet(GLUT_WINDOW_WIDTH) / 2 - 100, glutGet(GLUT_WINDOW_HEIGHT) / 2, "Collect all items before exiting!", GLUT_BITMAP_TIMES_ROMAN_24, 1.0f, 1.0f, 1.0f);
             }
         }
     }

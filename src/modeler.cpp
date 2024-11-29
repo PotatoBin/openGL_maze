@@ -19,11 +19,12 @@
 // 전역 변수 정의 (모델러 전용)
 Rect undoButton;
 Rect redoButton;
-Rect gameStartButton;
+Rect axisToggleButton;
 Rect difficultyDecreaseButton;
 Rect difficultyIncreaseButton;
 Rect angleDecreaseButton;
 Rect angleIncreaseButton;
+Rect buildOrGameStartButton;
 
 std::vector<scrPt> leftPoints;
 std::vector<scrPt> rightPoints;
@@ -31,11 +32,16 @@ std::stack<std::vector<scrPt>> leftUndoStack, rightUndoStack;
 std::stack<std::vector<scrPt>> leftRedoStack, rightRedoStack;
 bool isRedoEnabled = false;
 
-std::vector<int> angleValues = { 10, 15, 20, 30, 45, 60 };
+std::vector<int> angleValues = { 1, 2, 3, 4, 5, 6, 8, 9, 10, 15, 20, 30, 45, 60 };
 int angleValueIndex = 0;
 int numAngleValues = 6;
 
 int difficultyLevel = 1;
+char revolvingAxis = 'Y'; // 'Y' 또는 'X'
+
+bool isModelBuilt = false; // 모델이 생성되었는지 여부
+
+std::vector<std::vector<scrPt>> rotatedPoints; // 회전된 점들 저장
 
 // 스케일 팩터 정의 (1/1000)
 const float scaleFactor = 1.0f / 1000.0f;
@@ -78,13 +84,19 @@ void initModeler(void) {
 
     // 버튼 위치 초기화 (Y 좌표를 controlPanelHeight 내로 조정)
     // 버튼들을 controlPanelHeight 영역 내에서 적절하게 배치
-    undoButton = Rect(50, 30, 80, 30);
-    redoButton = Rect(150, 30, 80, 30);
-    gameStartButton = Rect(winWidth - 170, 30, 120, 30); // 위치 조정
-    difficultyDecreaseButton = Rect(winWidth - 670, 30, 30, 30);
-    difficultyIncreaseButton = Rect(winWidth - 590, 30, 30, 30);
-    angleDecreaseButton = Rect(winWidth - 370, 30, 30, 30);
-    angleIncreaseButton = Rect(winWidth - 290, 30, 30, 30);
+    int buttonY = 30;
+    int buttonWidth = 80;
+    int buttonHeight = 30;
+    int spacing = 20;
+
+    undoButton = Rect(50, buttonY, buttonWidth, buttonHeight);
+    redoButton = Rect(undoButton.x + buttonWidth + spacing, buttonY, buttonWidth, buttonHeight);
+    axisToggleButton = Rect(redoButton.x + buttonWidth + spacing, buttonY, buttonWidth, buttonHeight);
+    difficultyDecreaseButton = Rect(winWidth - 670, buttonY, 30, buttonHeight);
+    difficultyIncreaseButton = Rect(winWidth - 590, buttonY, 30, buttonHeight);
+    angleDecreaseButton = Rect(winWidth - 370, buttonY, 30, buttonHeight);
+    angleIncreaseButton = Rect(winWidth - 290, buttonY, 30, buttonHeight);
+    buildOrGameStartButton = Rect(winWidth - 170, buttonY, 120, buttonHeight); // 위치 조정
 
     checkGLError("initModeler");
 }
@@ -136,12 +148,17 @@ void drawButton(Rect button, const char* text, bool isEnabled, float r, float g,
 void displayButtons() {
     drawButton(undoButton, "Undo", !leftUndoStack.empty());
     drawButton(redoButton, "Redo", isRedoEnabled);
+    drawButton(axisToggleButton, revolvingAxis == 'Y' ? "Axis: Y" : "Axis: X", !isModelBuilt);
 
-    bool isGameStartEnabled = leftPoints.size() > 1;
-    if (isGameStartEnabled)
-        drawButton(gameStartButton, "Game Start", true, 0.53f, 0.81f, 0.98f);
+    bool isBuildEnabled = leftPoints.size() > 1 && !isModelBuilt;
+    bool isGameStartEnabled = isModelBuilt;
+
+    if (isBuildEnabled)
+        drawButton(buildOrGameStartButton, "Build Model", true, 0.53f, 0.81f, 0.98f);
+    else if (isGameStartEnabled)
+        drawButton(buildOrGameStartButton, "Game Start", true, 0.53f, 0.81f, 0.98f);
     else
-        drawButton(gameStartButton, "Game Start", false);
+        drawButton(buildOrGameStartButton, "Build Model", false);
 
     drawButton(angleDecreaseButton, "<", true);
     drawButton(angleIncreaseButton, ">", true);
@@ -210,66 +227,193 @@ void displayModelerWindow(void) {
 
     glLineWidth(2.0f);
 
-    // 왼쪽 선분 그리기
-    glColor3f(0.53f, 0.81f, 0.98f); // 연한 하늘색
-    glBegin(GL_LINE_STRIP);
-    for (const auto& pt : leftPoints) {
-        glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
-    }
-    glEnd();
-
-    // 오른쪽 선분 그리기
-    glBegin(GL_LINE_STRIP);
-    for (const auto& pt : rightPoints) {
-        glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
-    }
-    glEnd();
-
-    // 노란색 선 그리기
-    if (!leftPoints.empty() && !rightPoints.empty()) {
-        glLineWidth(2.0f);
-        glColor3f(1.0f, 1.0f, 0.0f); // 노란색
-        glBegin(GL_LINES);
-        // 시작점 연결선
-        glVertex2i(static_cast<int>(leftPoints.front().x + winWidth / 2), static_cast<int>(leftPoints.front().y + winHeight / 2));
-        glVertex2i(static_cast<int>(rightPoints.front().x + winWidth / 2), static_cast<int>(rightPoints.front().y + winHeight / 2));
-        // 끝점 연결선
-        glVertex2i(static_cast<int>(leftPoints.back().x + winWidth / 2), static_cast<int>(leftPoints.back().y + winHeight / 2));
-        glVertex2i(static_cast<int>(rightPoints.back().x + winWidth / 2), static_cast<int>(rightPoints.back().y + winHeight / 2));
+    if (!isModelBuilt) {
+        // 왼쪽 선분 그리기
+        glColor3f(0.53f, 0.81f, 0.98f); // 연한 하늘색
+        glBegin(GL_LINE_STRIP);
+        for (const auto& pt : leftPoints) {
+            glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
+        }
         glEnd();
 
-        // 노란색 선 중앙에 점 그리기
-        glPointSize(8.0f);
+        // 오른쪽 선분 그리기
+        glBegin(GL_LINE_STRIP);
+        for (const auto& pt : rightPoints) {
+            glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
+        }
+        glEnd();
+
+        // 노란색 선 그리기
+        if (!leftPoints.empty() && !rightPoints.empty()) {
+            glLineWidth(2.0f);
+            glColor3f(1.0f, 1.0f, 0.0f); // 노란색
+            glBegin(GL_LINES);
+            // 시작점 연결선
+            glVertex2i(static_cast<int>(leftPoints.front().x + winWidth / 2), static_cast<int>(leftPoints.front().y + winHeight / 2));
+            glVertex2i(static_cast<int>(rightPoints.front().x + winWidth / 2), static_cast<int>(rightPoints.front().y + winHeight / 2));
+            // 끝점 연결선
+            glVertex2i(static_cast<int>(leftPoints.back().x + winWidth / 2), static_cast<int>(leftPoints.back().y + winHeight / 2));
+            glVertex2i(static_cast<int>(rightPoints.back().x + winWidth / 2), static_cast<int>(rightPoints.back().y + winHeight / 2));
+            glEnd();
+
+            // 노란색 선 중앙에 점 그리기
+            glPointSize(8.0f);
+            glBegin(GL_POINTS);
+            // 시작점 연결선의 중앙
+            int midStartX = static_cast<int>((leftPoints.front().x + rightPoints.front().x) / 2 + winWidth / 2);
+            int midStartY = static_cast<int>((leftPoints.front().y + rightPoints.front().y) / 2 + winHeight / 2);
+            glVertex2i(midStartX, midStartY);
+            // 끝점 연결선의 중앙
+            int midEndX = static_cast<int>((leftPoints.back().x + rightPoints.back().x) / 2 + winWidth / 2);
+            int midEndY = static_cast<int>((leftPoints.back().y + rightPoints.back().y) / 2 + winHeight / 2);
+            glVertex2i(midEndX, midEndY);
+            glEnd();
+        }
+
+        // 좌우 점 그리기 (강조)
+        glPointSize(6.0f);
+        glColor3f(1.0f, 0.0f, 0.0f); // 빨간색으로 점 강조
         glBegin(GL_POINTS);
-        // 시작점 연결선의 중앙
-        int midStartX = static_cast<int>((leftPoints.front().x + rightPoints.front().x) / 2 + winWidth / 2);
-        int midStartY = static_cast<int>((leftPoints.front().y + rightPoints.front().y) / 2 + winHeight / 2);
-        glVertex2i(midStartX, midStartY);
-        // 끝점 연결선의 중앙
-        int midEndX = static_cast<int>((leftPoints.back().x + rightPoints.back().x) / 2 + winWidth / 2);
-        int midEndY = static_cast<int>((leftPoints.back().y + rightPoints.back().y) / 2 + winHeight / 2);
-        glVertex2i(midEndX, midEndY);
+        for (const auto& pt : leftPoints) {
+            glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
+        }
+        for (const auto& pt : rightPoints) {
+            glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
+        }
         glEnd();
     }
+    else {
+        // 모델을 화면에 그리기
+        glColor3f(0.0f, 0.0f, 1.0f); // 파란색
+        glLineWidth(1.0f);
 
-    // 좌우 점 그리기
-    glPointSize(6.0f);
-    glColor3f(0.0f, 0.0f, 0.0f); // 검은색
-    glBegin(GL_POINTS);
-    for (const auto& pt : leftPoints) {
-        glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
+        const float displayScaleFactor = 1000.0f;
+
+        // 위아래 중심점 계산
+        scrPt topCenter, bottomCenter;
+        if (revolvingAxis == 'Y') {
+            topCenter = scrPt(0.0f, rotatedPoints[0][0].y, 0.0f);
+            bottomCenter = scrPt(0.0f, rotatedPoints[0].back().y, 0.0f);
+        }
+        else { // revolvingAxis == 'X'
+            topCenter = scrPt(rotatedPoints[0][0].x, 0.0f, 0.0f);
+            bottomCenter = scrPt(rotatedPoints[0].back().x, 0.0f, 0.0f);
+        }
+
+        // 측면 그리기
+        for (size_t i = 0; i < rotatedPoints.size(); ++i) {
+            size_t nextI = (i + 1) % rotatedPoints.size();
+            for (size_t j = 0; j < rotatedPoints[i].size() - 1; ++j) {
+                // 현재 레이어의 점들
+                scrPt p1 = rotatedPoints[i][j];
+                scrPt p2 = rotatedPoints[nextI][j];
+                scrPt p3 = rotatedPoints[i][j + 1];
+                scrPt p4 = rotatedPoints[nextI][j + 1];
+
+                float x1, y1, x2, y2, x3, y3, x4, y4;
+
+                if (revolvingAxis == 'Y') {
+                    x1 = p1.x * displayScaleFactor + winWidth / 2;
+                    y1 = p1.y * displayScaleFactor + winHeight / 2;
+
+                    x2 = p2.x * displayScaleFactor + winWidth / 2;
+                    y2 = p2.y * displayScaleFactor + winHeight / 2;
+
+                    x3 = p3.x * displayScaleFactor + winWidth / 2;
+                    y3 = p3.y * displayScaleFactor + winHeight / 2;
+
+                    x4 = p4.x * displayScaleFactor + winWidth / 2;
+                    y4 = p4.y * displayScaleFactor + winHeight / 2;
+                }
+                else { // revolvingAxis == 'X'
+                    x1 = p1.z * displayScaleFactor + winWidth / 2;
+                    y1 = p1.y * displayScaleFactor + winHeight / 2;
+
+                    x2 = p2.z * displayScaleFactor + winWidth / 2;
+                    y2 = p2.y * displayScaleFactor + winHeight / 2;
+
+                    x3 = p3.z * displayScaleFactor + winWidth / 2;
+                    y3 = p3.y * displayScaleFactor + winHeight / 2;
+
+                    x4 = p4.z * displayScaleFactor + winWidth / 2;
+                    y4 = p4.y * displayScaleFactor + winHeight / 2;
+                }
+
+                // 선 그리기
+                glBegin(GL_LINES);
+                glVertex2f(x1, y1);
+                glVertex2f(x2, y2);
+
+                glVertex2f(x1, y1);
+                glVertex2f(x3, y3);
+
+                glVertex2f(x2, y2);
+                glVertex2f(x4, y4);
+
+                glVertex2f(x3, y3);
+                glVertex2f(x4, y4);
+                glEnd();
+
+                // 점 그리기 (강조)
+                glPointSize(4.0f);
+                glColor3f(1.0f, 0.0f, 0.0f); // 빨간색
+                glBegin(GL_POINTS);
+                glVertex2f(x1, y1);
+                glVertex2f(x2, y2);
+                glVertex2f(x3, y3);
+                glVertex2f(x4, y4);
+                glEnd();
+                glColor3f(0.0f, 0.0f, 1.0f); // 색상 복원
+            }
+        }
+
+        // 위아래 면 그리기
+        // 위 면
+        glBegin(GL_POLYGON);
+        for (size_t i = 0; i < rotatedPoints.size(); ++i) {
+            scrPt p = rotatedPoints[i][0];
+            float x, y;
+
+            if (revolvingAxis == 'Y') {
+                x = p.x * displayScaleFactor + winWidth / 2;
+                y = p.y * displayScaleFactor + winHeight / 2;
+            }
+            else {
+                x = p.z * displayScaleFactor + winWidth / 2;
+                y = p.y * displayScaleFactor + winHeight / 2;
+            }
+            glVertex2f(x, y);
+        }
+        glEnd();
+
+        // 아래 면
+        glBegin(GL_POLYGON);
+        for (size_t i = 0; i < rotatedPoints.size(); ++i) {
+            scrPt p = rotatedPoints[i].back();
+            float x, y;
+
+            if (revolvingAxis == 'Y') {
+                x = p.x * displayScaleFactor + winWidth / 2;
+                y = p.y * displayScaleFactor + winHeight / 2;
+            }
+            else {
+                x = p.z * displayScaleFactor + winWidth / 2;
+                y = p.y * displayScaleFactor + winHeight / 2;
+            }
+            glVertex2f(x, y);
+        }
+        glEnd();
     }
-    for (const auto& pt : rightPoints) {
-        glVertex2i(static_cast<int>(pt.x + winWidth / 2), static_cast<int>(pt.y + winHeight / 2));
-    }
-    glEnd();
 
     glutSwapBuffers(); // 더블 버퍼링을 위한 버퍼 교환
 }
 
 // Undo 기능을 수행하는 함수
 void undo() {
-    if (!leftUndoStack.empty() && !rightUndoStack.empty()) {
+    if (isModelBuilt) {
+        clearModel();
+    }
+    else if (!leftUndoStack.empty() && !rightUndoStack.empty()) {
         leftRedoStack.push(leftPoints);
         rightRedoStack.push(rightPoints);
         leftPoints = leftUndoStack.top();
@@ -277,6 +421,7 @@ void undo() {
         leftUndoStack.pop();
         rightUndoStack.pop();
         isRedoEnabled = true;
+
         glutPostRedisplay();
     }
 }
@@ -301,7 +446,8 @@ void redo() {
 void createModel() {
     std::cout << "Creating model with " << leftPoints.size() << " points on the left and " << rightPoints.size() << " points on the right." << std::endl;
 
-    std::vector<std::vector<scrPt>> rotatedPoints;
+    rotatedPoints.clear(); // 회전된 점들 초기화
+
     int revolvingAngle = angleValues[angleValueIndex];
     double radian = (M_PI / 180.0) * revolvingAngle;
     int segments = 360 / revolvingAngle;
@@ -310,46 +456,27 @@ void createModel() {
     for (int i = 0; i < segments; ++i) {
         std::vector<scrPt> rotatedLayer;
         for (const auto& pt : leftPoints) {
-            double x = pt.x * cos(i * radian) * scaleFactor;
-            double z = pt.x * sin(i * radian) * scaleFactor;
-            double y = pt.y * scaleFactor;
+            double x, y, z;
+            if (revolvingAxis == 'Y') {
+                x = pt.x * cos(i * radian) * scaleFactor;
+                z = pt.x * sin(i * radian) * scaleFactor;
+                y = pt.y * scaleFactor;
+            }
+            else { // revolvingAxis == 'X'
+                y = pt.y * cos(i * radian) * scaleFactor;
+                z = pt.y * sin(i * radian) * scaleFactor;
+                x = pt.x * scaleFactor;
+            }
+            // Axis가 X일 때 모델을 Y축 기준으로 -90도 회전
+            if (revolvingAxis == 'X') {
+                double tempX = x;
+                x = -z;
+                z = tempX;
+            }
             rotatedLayer.push_back(scrPt{ static_cast<float>(x), static_cast<float>(y), static_cast<float>(z) });
         }
         rotatedPoints.push_back(rotatedLayer);
     }
-
-    // mesh 연결
-    glBegin(GL_TRIANGLES);
-    for (int i = 0; i < segments - 1; ++i) {
-        for (size_t j = 0; j < leftPoints.size() - 1; ++j) {
-            const auto& p1 = rotatedPoints[i][j];
-            const auto& p2 = rotatedPoints[i + 1][j];
-            const auto& p3 = rotatedPoints[i][j + 1];
-            const auto& p4 = rotatedPoints[i + 1][j + 1];
-
-            glVertex3f(p1.x, p1.y, p1.z);
-            glVertex3f(p2.x, p2.y, p2.z);
-            glVertex3f(p3.x, p3.y, p3.z);
-
-            glVertex3f(p2.x, p2.y, p2.z);
-            glVertex3f(p4.x, p4.y, p4.z);
-            glVertex3f(p3.x, p3.y, p3.z);
-        }
-    }
-    glEnd();
-
-    // 위아래 면
-    glBegin(GL_POLYGON);
-    for (int i = 0; i < segments; ++i) {
-        glVertex3f(rotatedPoints[i].front().x, rotatedPoints[i].front().y, rotatedPoints[i].front().z);
-    }
-    glEnd();
-
-    glBegin(GL_POLYGON);
-    for (int i = 0; i < segments; ++i) {
-        glVertex3f(rotatedPoints[i].back().x, rotatedPoints[i].back().y, rotatedPoints[i].back().z);
-    }
-    glEnd();
 
     // obj 파일 생성
     std::ofstream outFile("model.obj");
@@ -366,10 +493,19 @@ void createModel() {
     }
 
     // 위아래 중심점 추가
-    float topY = rotatedPoints[0][0].y;
-    float bottomY = rotatedPoints[0].back().y;
-    outFile << "v 0.0 " << topY << " 0.0\n"; // top center point
-    outFile << "v 0.0 " << bottomY << " 0.0\n"; // bottom center point
+    float topCoord, bottomCoord;
+    if (revolvingAxis == 'Y') {
+        topCoord = rotatedPoints[0][0].y;
+        bottomCoord = rotatedPoints[0].back().y;
+        outFile << "v 0.0 " << topCoord << " 0.0\n"; // top center point
+        outFile << "v 0.0 " << bottomCoord << " 0.0\n"; // bottom center point
+    }
+    else {
+        topCoord = rotatedPoints[0][0].y;
+        bottomCoord = rotatedPoints[0].back().y;
+        outFile << "v 0.0 " << topCoord << " 0.0\n"; // top center point
+        outFile << "v 0.0 " << bottomCoord << " 0.0\n"; // bottom center point
+    }
 
     int totalVertices = segments * leftPoints.size() + 2; // +2 for the top and bottom center points
     int topCenterIndex = totalVertices - 1;
@@ -401,6 +537,19 @@ void createModel() {
 
     outFile.close();
     std::cout << "Model saved as model.obj\n" << std::endl;
+
+    // 모델이 생성되었음을 표시
+    isModelBuilt = true;
+    glutPostRedisplay();
+}
+
+// 모델을 지우는 함수
+void clearModel() {
+    // 모델을 지우기 위해 필요한 처리를 수행합니다.
+    // 여기서는 OBJ 파일을 삭제하지 않고, 모델 생성 상태를 false로 변경합니다.
+    isModelBuilt = false;
+    rotatedPoints.clear();
+    glutPostRedisplay();
 }
 
 // 마우스 클릭 이벤트를 처리하는 함수
@@ -411,9 +560,43 @@ void mouseModeler(int button, int state, int x, int y) {
         if (yInverted <= controlPanelHeight) { // 컨트롤 패널 영역
             if (undoButton.contains(x, yInverted)) undo();
             else if (redoButton.contains(x, yInverted) && isRedoEnabled) redo();
-            else if (gameStartButton.contains(x, yInverted)) {
-                if (leftPoints.size() > 1) {
+            else if (axisToggleButton.contains(x, yInverted) && !isModelBuilt) {
+                // 축 변경 및 점 회전
+                if (revolvingAxis == 'Y') {
+                    revolvingAxis = 'X';
+                    // 점 회전 (90도)
+                    for (auto& pt : leftPoints) {
+                        float temp = pt.x;
+                        pt.x = pt.y;
+                        pt.y = -temp;
+                    }
+                    for (auto& pt : rightPoints) {
+                        float temp = pt.x;
+                        pt.x = pt.y;
+                        pt.y = -temp;
+                    }
+                }
+                else {
+                    revolvingAxis = 'Y';
+                    // 점 회전 (-90도)
+                    for (auto& pt : leftPoints) {
+                        float temp = pt.x;
+                        pt.x = -pt.y;
+                        pt.y = temp;
+                    }
+                    for (auto& pt : rightPoints) {
+                        float temp = pt.x;
+                        pt.x = -pt.y;
+                        pt.y = temp;
+                    }
+                }
+                glutPostRedisplay();
+            }
+            else if (buildOrGameStartButton.contains(x, yInverted)) {
+                if (!isModelBuilt && leftPoints.size() > 1) {
                     createModel();
+                }
+                else if (isModelBuilt) {
                     generateMaze();
 
                     // 모델러 윈도우를 숨기고 게임 윈도우를 표시
@@ -443,12 +626,26 @@ void mouseModeler(int button, int state, int x, int y) {
             }
         }
         else { // 모델링 영역
+            if (isModelBuilt) {
+                // 모델이 생성된 상태에서는 편집 불가
+                return;
+            }
+
             saveCurrentStateToUndo();
             int centeredX = x - winWidth / 2;
             int centeredY = yInverted - winHeight / 2;
+
             scrPt pt(static_cast<float>(centeredX), static_cast<float>(centeredY), 0.0f);
-            scrPt mirroredPt(-static_cast<float>(centeredX), static_cast<float>(centeredY), 0.0f);
-            if (x < winWidth / 2) {
+            scrPt mirroredPt;
+
+            if (revolvingAxis == 'Y') {
+                mirroredPt = scrPt(-static_cast<float>(centeredX), static_cast<float>(centeredY), 0.0f);
+            }
+            else { // revolvingAxis == 'X'
+                mirroredPt = scrPt(static_cast<float>(centeredX), -static_cast<float>(centeredY), 0.0f);
+            }
+
+            if ((revolvingAxis == 'Y' && x < winWidth / 2) || (revolvingAxis == 'X' && yInverted > winHeight / 2)) {
                 leftPoints.push_back(pt);
                 rightPoints.push_back(mirroredPt);
             }
