@@ -226,7 +226,7 @@ bool isColliding(float x, float z) {
 
 // 게임 윈도우를 초기화하는 함수
 void initGame(void) {
-    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // 배경을 검정색으로 설정
     glEnable(GL_DEPTH_TEST);
 
     // 기존 조명 설정 제거
@@ -242,10 +242,6 @@ void initGame(void) {
 
     // 깊이 테스트 설정
     glEnable(GL_DEPTH_TEST);
-
-    // 그림자 효과를 위해 블렌딩 활성화 제거
-    // glEnable(GL_BLEND);
-    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 // 키보드 상태 추적을 위한 전역 변수
@@ -332,7 +328,7 @@ void renderText(float x, float y, const std::string& text, void* font = GLUT_BIT
 
     glDisable(GL_LIGHTING); // 조명 끄기
     glDisable(GL_DEPTH_TEST); // 깊이 테스트 끄기
-    glColor3f(0.0f, 0.0f, 0.0f);
+    glColor3f(1.0f, 1.0f, 1.0f); // 흰색 텍스트
 
     // 텍스트 시작 위치 설정
     glRasterPos2f(x, y);
@@ -369,19 +365,36 @@ void displayGameWindow(void) {
     // 카메라 틸트 감쇠
     cameraTiltIntensity *= 0.9f; // 감쇠율
 
-    // 플레이어 위치에 따라다니는 조명 설정
+    // 조명 설정
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
 
-    GLfloat ambientLight[] = { 0.2f, 0.2f, 0.2f, 1.0f }; // 주변광 (약하게)
-    GLfloat diffuseLight[] = { 0.8f, 0.8f, 0.8f, 1.0f }; // 확산광
-    GLfloat specularLight[] = { 1.0f, 1.0f, 1.0f, 1.0f }; // 반사광
-    GLfloat lightPosition[] = { player.x, player.y + 1.0f, player.z, 1.0f }; // 플레이어 머리 위에 조명 위치
+    // 글로벌 앰비언트 라이트 약간 증가
+    GLfloat globalAmbient[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
+
+    // 손전등 효과를 위한 스포트라이트 설정
+    GLfloat lightPos[] = { player.x, player.y, player.z, 1.0f };
+    GLfloat spotDir[] = { dirX, dirY, dirZ };
+
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+    glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, spotDir);
+    glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 35.0f); // 스포트라이트 각도 증가
+    glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 8.0f); // 스포트라이트 집중도 조정
+
+    // 조명 색상 설정
+    GLfloat ambientLight[] = { 0.1f, 0.1f, 0.1f, 1.0f }; // 주변광 약간 추가
+    GLfloat diffuseLight[] = { 1.2f, 1.2f, 1.0f, 1.0f }; // 확산광 밝게
+    GLfloat specularLight[] = { 1.2f, 1.2f, 1.0f, 1.0f }; // 반사광 밝게
 
     glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
     glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
-    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+
+    // 거리 감쇠 설정 (빛의 범위 증가)
+    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
+    glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.05f);
+    glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.02f);
 
     // 색상 재질 사용
     glEnable(GL_COLOR_MATERIAL);
@@ -389,7 +402,7 @@ void displayGameWindow(void) {
 
     // 바닥 그리기
     glPushMatrix();
-    glColor3f(0.2f, 0.2f, 0.2f); // 바닥은 어두운 회색
+    glColor3f(0.3f, 0.3f, 0.3f); // 바닥은 약간 더 밝은 회색
     glBegin(GL_QUADS);
     glNormal3f(0.0f, 1.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 0.0f);
@@ -400,7 +413,7 @@ void displayGameWindow(void) {
     glPopMatrix();
 
     // 미로 벽 그리기
-    glColor3f(0.8f, 0.8f, 0.8f); // 벽은 밝은 회색
+    glColor3f(0.7f, 0.7f, 0.7f); // 벽은 약간 더 밝은 회색
     float wallHeight = 2.0f;
 
     for (int i = 0; i < maze.mazeData.size(); ++i) {
