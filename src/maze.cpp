@@ -1,4 +1,4 @@
-ï»¿// maze.cpp
+// maze.cpp
 #include "maze.h"
 #include "modeler.h"
 #include <GL/glut.h>
@@ -9,18 +9,19 @@
 #include <fstream>
 #include <sstream>
 
-// 'M_PI' ì •ì˜ (ì •ì˜ë˜ì§€ ì•Šì€ ê²½ìš°)
+// 'M_PI' Á¤ÀÇ (Á¤ÀÇµÇÁö ¾ÊÀº °æ¿ì)
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-// í”Œë ˆì´ì–´ ë° ë¯¸ë¡œ ë°ì´í„° ì •ì˜
+// ÇÃ·¹ÀÌ¾î ¹× ¹Ì·Î µ¥ÀÌÅÍ Á¤ÀÇ
 Player player;
 Maze maze;
 Model model;
+Game game;
 std::vector<Item> items;
 
-// í”„ë¦¼ ì•Œê³ ë¦¬ì¦˜ì„ ì‚¬ìš©í•˜ì—¬ ë¯¸ë¡œë¥¼ ìƒì„±í•˜ëŠ” í•¨ìˆ˜
+// ÇÁ¸² ¾Ë°í¸®ÁòÀ» »ç¿ëÇÏ¿© ¹Ì·Î¸¦ »ı¼ºÇÏ´Â ÇÔ¼ö
 void primMaze(std::vector<std::vector<int>>& mazeGrid) {
     int size = mazeGrid.size();
 
@@ -67,7 +68,7 @@ void primMaze(std::vector<std::vector<int>>& mazeGrid) {
     }
 }
 
-// OBJ íŒŒì¼ì„ ë¡œë“œí•˜ëŠ” í•¨ìˆ˜
+// OBJ ÆÄÀÏÀ» ·ÎµåÇÏ´Â ÇÔ¼ö
 bool loadOBJ(const std::string& filename, Model& model) {
     std::ifstream infile(filename);
     if (!infile.is_open()) {
@@ -102,7 +103,7 @@ bool loadOBJ(const std::string& filename, Model& model) {
             }
             model.faces.push_back(face);
         }
-        // ë‹¤ë¥¸ í”„ë¦¬í”½ìŠ¤ëŠ” ë¬´ì‹œ
+        // ´Ù¸¥ ÇÁ¸®ÇÈ½º´Â ¹«½Ã
     }
 
     infile.close();
@@ -112,9 +113,9 @@ bool loadOBJ(const std::string& filename, Model& model) {
     return true;
 }
 
-// ë¯¸ë¡œë¥¼ ìƒì„±í•˜ëŠ” í•¨ìˆ˜
+// ¹Ì·Î¸¦ »ı¼ºÇÏ´Â ÇÔ¼ö
 void generateMaze() {
-    int currentDifficultyLevel = difficultyLevel; // ëª¨ë¸ëŸ¬ì—ì„œ ê°€ì ¸ì˜´
+    int currentDifficultyLevel = difficultyLevel; // ¸ğµ¨·¯¿¡¼­ °¡Á®¿È
     int mazeSize = currentDifficultyLevel * 12 + 1;
     maze.mazeData = std::vector<std::vector<int>>(mazeSize, std::vector<int>(mazeSize, 1));
     maze.cellSize = 1.0f;
@@ -125,39 +126,42 @@ void generateMaze() {
 
     maze.mazeData[mazeSize - 2][mazeSize - 2] = 0;
 
-    maze.mazeData[1][1] = 5; // ì‹œì‘ ìœ„ì¹˜
-    maze.mazeData[mazeSize - 2][mazeSize - 2] = 6; // ëª©í‘œ ìœ„ì¹˜
+    maze.mazeData[1][1] = 5; // ½ÃÀÛ À§Ä¡
+    maze.mazeData[mazeSize - 2][mazeSize - 2] = 6; // ¸ñÇ¥ À§Ä¡
 
-    // ì•„ì´í…œ ë°°ì¹˜ (ë‚œì´ë„ì— ë”°ë¼ ëœë¤í•˜ê²Œ ë°°ì¹˜)
-    int itemCount = currentDifficultyLevel; // ë‚œì´ë„ì— ë”°ë¼ ì•„ì´í…œ ìˆ˜ ì¡°ì •
+    game.exitgridX = mazeSize - 2;   // ¸ñÇ¥ ÁÂÇ¥ ÀúÀå
+    game.exitgridZ = mazeSize - 2;
+
+    // ¾ÆÀÌÅÛ ¹èÄ¡ (³­ÀÌµµ¿¡ µû¶ó ·£´ıÇÏ°Ô ¹èÄ¡)
+    int itemCount = currentDifficultyLevel; // ³­ÀÌµµ¿¡ µû¶ó ¾ÆÀÌÅÛ ¼ö Á¶Á¤
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(1, mazeSize - 2);
 
-    items.clear(); // ì•„ì´í…œ ë¦¬ìŠ¤íŠ¸ ì´ˆê¸°í™”
+    items.clear(); // ¾ÆÀÌÅÛ ¸®½ºÆ® ÃÊ±âÈ­
 
     while (items.size() < static_cast<size_t>(itemCount)) {
         int i = dis(gen);
         int j = dis(gen);
-        if (maze.mazeData[j][i] == 0) { // ê²½ë¡œì—ë§Œ ì•„ì´í…œ ë°°ì¹˜
+        if (maze.mazeData[j][i] == 0) { // °æ·Î¿¡¸¸ ¾ÆÀÌÅÛ ¹èÄ¡
             maze.mazeData[j][i] = 2;
             items.emplace_back(i, j);
         }
     }
 
-    // í”Œë ˆì´ì–´ ì‹œì‘ ìœ„ì¹˜ ì„¤ì •
+    // ÇÃ·¹ÀÌ¾î ½ÃÀÛ À§Ä¡ ¼³Á¤
     player.x = 1.5f;
-    player.y = 1.3f; // ì¹´ë©”ë¼ ë†’ì´ ì¡°ì •
+    player.y = 1.3f; // Ä«¸Ş¶ó ³ôÀÌ Á¶Á¤
     player.z = 1.5f;
     player.verticalVelocity = 0.0f;
     player.onGround = true;
 
-    // ëª¨ë¸ ë¡œë“œ
-    if (!loadOBJ("model.obj", model)) { // "model.obj" íŒŒì¼ ê²½ë¡œ í™•ì¸
+    // ¸ğµ¨ ·Îµå
+    if (!loadOBJ("model.obj", model)) { // "model.obj" ÆÄÀÏ °æ·Î È®ÀÎ
         std::cerr << "Failed to load model.obj" << std::endl;
     }
 
-    // ìƒì„±ëœ ë¯¸ë¡œë¥¼ ì½˜ì†”ì— ì¶œë ¥
+    // »ı¼ºµÈ ¹Ì·Î¸¦ ÄÜ¼Ö¿¡ Ãâ·Â
     std::cout << "Generated Maze (" << mazeSize << "x" << mazeSize << "):" << std::endl;
     for (const auto& row : maze.mazeData) {
         for (const auto& cell : row) {
@@ -170,7 +174,7 @@ void generateMaze() {
             else if (cell == 6)
                 std::cout << "E ";
             else if (cell == 2)
-                std::cout << "I "; // ì•„ì´í…œ ìœ„ì¹˜ í‘œì‹œ
+                std::cout << "I "; // ¾ÆÀÌÅÛ À§Ä¡ Ç¥½Ã
             else
                 std::cout << "? ";
         }
@@ -178,32 +182,32 @@ void generateMaze() {
     }
 }
 
-// ì¶©ëŒ ê°ì§€ í•¨ìˆ˜: í”Œë ˆì´ì–´ì˜ (x, z) ìœ„ì¹˜ê°€ ë¯¸ë¡œì˜ ë²½ê³¼ ì¶©ëŒí•˜ëŠ”ì§€ í™•ì¸
+// Ãæµ¹ °¨Áö ÇÔ¼ö: ÇÃ·¹ÀÌ¾îÀÇ (x, z) À§Ä¡°¡ ¹Ì·ÎÀÇ º®°ú Ãæµ¹ÇÏ´ÂÁö È®ÀÎ
 bool isColliding(float x, float z) {
-    // í”Œë ˆì´ì–´ì˜ ì¶©ëŒ ë°˜ê²½ (0.4ë¡œ ì¦ê°€)
+    // ÇÃ·¹ÀÌ¾îÀÇ Ãæµ¹ ¹İ°æ (0.4·Î Áõ°¡)
     const float playerRadius = 0.4f;
 
-    // í”Œë ˆì´ì–´ê°€ ì†í•œ ê·¸ë¦¬ë“œ ì…€
+    // ÇÃ·¹ÀÌ¾î°¡ ¼ÓÇÑ ±×¸®µå ¼¿
     int cellX = static_cast<int>(floor(x / maze.cellSize));
     int cellZ = static_cast<int>(floor(z / maze.cellSize));
 
-    // ì£¼ë³€ 3x3 ì…€ ê²€ì‚¬
+    // ÁÖº¯ 3x3 ¼¿ °Ë»ç
     for (int i = cellX - 1; i <= cellX + 1; ++i) {
         for (int j = cellZ - 1; j <= cellZ + 1; ++j) {
-            // ë¯¸ë¡œì˜ ë²”ìœ„ë¥¼ ë²—ì–´ë‚˜ì§€ ì•Šë„ë¡ ê²€ì‚¬
+            // ¹Ì·ÎÀÇ ¹üÀ§¸¦ ¹ş¾î³ªÁö ¾Êµµ·Ï °Ë»ç
             if (i >= 0 && i < static_cast<int>(maze.mazeData[0].size()) &&
                 j >= 0 && j < static_cast<int>(maze.mazeData.size())) {
-                if (maze.mazeData[j][i] == 1) { // ë²½ ì…€
-                    // ë²½ì˜ ì¤‘ì‹¬ ìœ„ì¹˜ ê³„ì‚°
+                if (maze.mazeData[j][i] == 1) { // º® ¼¿
+                    // º®ÀÇ Áß½É À§Ä¡ °è»ê
                     float wallCenterX = (i + 0.5f) * maze.cellSize;
                     float wallCenterZ = (j + 0.5f) * maze.cellSize;
 
-                    // í”Œë ˆì´ì–´ì™€ ë²½ ì¤‘ì‹¬ ê°„ì˜ ê±°ë¦¬ ê³„ì‚°
+                    // ÇÃ·¹ÀÌ¾î¿Í º® Áß½É °£ÀÇ °Å¸® °è»ê
                     float dx = x - wallCenterX;
                     float dz = z - wallCenterZ;
                     float distance = sqrtf(dx * dx + dz * dz);
 
-                    // ë²½ê³¼ í”Œë ˆì´ì–´ì˜ ì¶©ëŒ ì—¬ë¶€ í™•ì¸
+                    // º®°ú ÇÃ·¹ÀÌ¾îÀÇ Ãæµ¹ ¿©ºÎ È®ÀÎ
                     if (distance < playerRadius + (maze.cellSize / 2.0f)) {
                         return true;
                     }
@@ -215,67 +219,67 @@ bool isColliding(float x, float z) {
     return false;
 }
 
-// ê²Œì„ ìœˆë„ìš°ë¥¼ ì´ˆê¸°í™”í•˜ëŠ” í•¨ìˆ˜
+// °ÔÀÓ À©µµ¿ì¸¦ ÃÊ±âÈ­ÇÏ´Â ÇÔ¼ö
 void initGame(void) {
     glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
     glEnable(GL_DEPTH_TEST);
 
-    // ì¡°ëª… ì„¤ì •
+    // Á¶¸í ¼³Á¤
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
 
-    GLfloat ambientLight[] = { 0.5f, 0.5f, 0.5f, 1.0f }; // ì£¼ë³€ê´‘ (ê°•ì¡°)
-    GLfloat diffuseLight[] = { 0.7f, 0.7f, 0.7f, 1.0f }; // í™•ì‚°ê´‘
-    GLfloat specularLight[] = { 0.9f, 0.9f, 0.9f, 1.0f }; // ë°˜ì‚¬ê´‘
-    GLfloat lightPosition[] = { 0.0f, 10.0f, 0.0f, 1.0f }; // ì¡°ëª… ìœ„ì¹˜ (ìœ„ì—ì„œ ë¹„ì¶”ëŠ” ë¹›)
+    GLfloat ambientLight[] = { 0.5f, 0.5f, 0.5f, 1.0f }; // ÁÖº¯±¤ (°­Á¶)
+    GLfloat diffuseLight[] = { 0.7f, 0.7f, 0.7f, 1.0f }; // È®»ê±¤
+    GLfloat specularLight[] = { 0.9f, 0.9f, 0.9f, 1.0f }; // ¹İ»ç±¤
+    GLfloat lightPosition[] = { 0.0f, 10.0f, 0.0f, 1.0f }; // Á¶¸í À§Ä¡ (À§¿¡¼­ ºñÃß´Â ºû)
 
     glLightfv(GL_LIGHT0, GL_AMBIENT, ambientLight);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseLight);
     glLightfv(GL_LIGHT0, GL_SPECULAR, specularLight);
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
 
-    // ìƒ‰ìƒ ì¬ì§ˆ ì‚¬ìš©
+    // »ö»ó ÀçÁú »ç¿ë
     glEnable(GL_COLOR_MATERIAL);
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
 
-    // ì‰ì´ë”© ëª¨ë“œ ì„¤ì •
+    // ½¦ÀÌµù ¸ğµå ¼³Á¤
     glShadeModel(GL_SMOOTH);
 
-    // ê¹Šì´ í…ŒìŠ¤íŠ¸ ì„¤ì •
+    // ±íÀÌ Å×½ºÆ® ¼³Á¤
     glEnable(GL_DEPTH_TEST);
 
-    // ê·¸ë¦¼ì íš¨ê³¼ë¥¼ ìœ„í•´ ë¸”ë Œë”© í™œì„±í™”
+    // ±×¸²ÀÚ È¿°ú¸¦ À§ÇØ ºí·»µù È°¼ºÈ­
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
-// í‚¤ë³´ë“œ ìƒíƒœ ì¶”ì ì„ ìœ„í•œ ì „ì—­ ë³€ìˆ˜
+// Å°º¸µå »óÅÂ ÃßÀûÀ» À§ÇÑ Àü¿ª º¯¼ö
 bool keys[256] = { false };
 
-// í‚¤ë³´ë“œ ëˆŒë¦¼ ì´ë²¤íŠ¸ ì²˜ë¦¬
+// Å°º¸µå ´­¸² ÀÌº¥Æ® Ã³¸®
 void keyboardPress(unsigned char key, int x, int y) {
     keys[key] = true;
     keyboardGame(key, x, y);
 }
 
-// í‚¤ë³´ë“œ ë†“ì„ ì´ë²¤íŠ¸ ì²˜ë¦¬
+// Å°º¸µå ³õÀÓ ÀÌº¥Æ® Ã³¸®
 void keyboardRelease(unsigned char key, int x, int y) {
     keys[key] = false;
 }
 
-// ìˆ˜ì •ëœ ì´ˆê¸°í™” í•¨ìˆ˜: í‚¤ë³´ë“œ ì½œë°± ì„¤ì • í¬í•¨
+// ¼öÁ¤µÈ ÃÊ±âÈ­ ÇÔ¼ö: Å°º¸µå Äİ¹é ¼³Á¤ Æ÷ÇÔ
 void initGameModified(void) {
     initGame();
-    // í‚¤ë³´ë“œ ëˆŒë¦¼ ë° ë†“ì„ ì½œë°± ì„¤ì •
+    // Å°º¸µå ´­¸² ¹× ³õÀÓ Äİ¹é ¼³Á¤
     glutKeyboardFunc(keyboardPress);
     glutKeyboardUpFunc(keyboardRelease);
 }
 
-// ëª¨ë¸ì„ ë Œë”ë§í•˜ëŠ” í•¨ìˆ˜
+// ¸ğµ¨À» ·»´õ¸µÇÏ´Â ÇÔ¼ö
 void renderModel() {
     glBegin(GL_TRIANGLES);
     for (const auto& face : model.faces) {
-        // OBJ íŒŒì¼ì˜ ì¸ë±ìŠ¤ëŠ” 1ë¶€í„° ì‹œì‘í•˜ë¯€ë¡œ 1ì„ ë¹¼ì¤ë‹ˆë‹¤.
+        // OBJ ÆÄÀÏÀÇ ÀÎµ¦½º´Â 1ºÎÅÍ ½ÃÀÛÇÏ¹Ç·Î 1À» »©Áİ´Ï´Ù.
         for (int idx : face) {
             if (idx <= 0 || idx > static_cast<int>(model.vertices.size() / 3)) continue;
             glVertex3f(model.vertices[(idx - 1) * 3],
@@ -286,12 +290,12 @@ void renderModel() {
     glEnd();
 }
 
-// ì•„ì´í…œ ì• ë‹ˆë©”ì´ì…˜ ì—…ë°ì´íŠ¸ í•¨ìˆ˜
+// ¾ÆÀÌÅÛ ¾Ö´Ï¸ŞÀÌ¼Ç ¾÷µ¥ÀÌÆ® ÇÔ¼ö
 void animateItems(float deltaTime) {
     for (auto& item : items) {
-        // ì™•ë³µ ìš´ë™: oscillateOffsetì„ ì´ìš©í•˜ì—¬ yì¶• ë°©í–¥ìœ¼ë¡œ ì´ë™
-        float oscillateSpeed = 0.5f; // ì™•ë³µ ìš´ë™ ì†ë„ (units per second)
-        float oscillateRange = 0.2f; // ì™•ë³µ ìš´ë™ ë²”ìœ„ (units)
+        // ¿Õº¹ ¿îµ¿: oscillateOffsetÀ» ÀÌ¿ëÇÏ¿© yÃà ¹æÇâÀ¸·Î ÀÌµ¿
+        float oscillateSpeed = 0.5f; // ¿Õº¹ ¿îµ¿ ¼Óµµ (units per second)
+        float oscillateRange = 0.2f; // ¿Õº¹ ¿îµ¿ ¹üÀ§ (units)
 
         if (item.movingForward) {
             item.oscillateOffset += oscillateSpeed * deltaTime;
@@ -308,27 +312,57 @@ void animateItems(float deltaTime) {
             }
         }
 
-        // íšŒì „ ê°ë„ ì¦ê°€
-        float rotationSpeed = 90.0f; // ì´ˆë‹¹ íšŒì „ ê°ë„ (degrees per second)
+        // È¸Àü °¢µµ Áõ°¡
+        float rotationSpeed = 90.0f; // ÃÊ´ç È¸Àü °¢µµ (degrees per second)
         item.rotationAngle += rotationSpeed * deltaTime;
         if (item.rotationAngle >= 360.0f)
             item.rotationAngle -= 360.0f;
     }
 }
 
-// ì¹´ë©”ë¼ í”ë“¤ë¦¼ íš¨ê³¼ë¥¼ ìœ„í•œ ë³€ìˆ˜
+// Ä«¸Ş¶ó Èçµé¸² È¿°ú¸¦ À§ÇÑ º¯¼ö
 float cameraTiltOffset = 0.0f;
 float cameraTiltIntensity = 0.0f;
 
-// ê²Œì„ ìœˆë„ìš°ë¥¼ í‘œì‹œí•˜ëŠ” í•¨ìˆ˜
+// È­¸é¿¡ ÅØ½ºÆ®¸¦ ·»´õ¸µÇÏ´Â ÇÔ¼ö
+void renderText(float x, float y, const std::string& text, void* font = GLUT_BITMAP_HELVETICA_18) {
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0.0, glutGet(GLUT_WINDOW_WIDTH), 0.0, glutGet(GLUT_WINDOW_HEIGHT));
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glDisable(GL_LIGHTING); // Á¶¸í ²ô±â
+    glDisable(GL_DEPTH_TEST); // ±íÀÌ Å×½ºÆ® ²ô±â
+    glColor3f(0.0f, 0.0f, 0.0f);
+
+    // ÅØ½ºÆ® ½ÃÀÛ À§Ä¡ ¼³Á¤
+    glRasterPos2f(x, y); 
+    for (char c : text) {
+        glutBitmapCharacter(font, c);
+    }
+
+    glEnable(GL_DEPTH_TEST); // ±íÀÌ Å×½ºÆ® ´Ù½Ã È°¼ºÈ­
+    glEnable(GL_LIGHTING);   // Á¶¸í ´Ù½Ã È°¼ºÈ­
+
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// °ÔÀÓ À©µµ¿ì¸¦ Ç¥½ÃÇÏ´Â ÇÔ¼ö
 void displayGameWindow(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
-    // ì¹´ë©”ë¼ í‹¸íŠ¸ ì ìš©
+    // Ä«¸Ş¶ó Æ¿Æ® Àû¿ë
     float tilt = cameraTiltIntensity * sin(glutGet(GLUT_ELAPSED_TIME) * 0.01f);
 
-    // ì¹´ë©”ë¼ ì„¤ì •
+    // Ä«¸Ş¶ó ¼³Á¤
     float dirX = sinf(player.angleY * static_cast<float>(M_PI) / 180.0f) * cosf((player.angleX + tilt) * static_cast<float>(M_PI) / 180.0f);
     float dirY = sinf((player.angleX + tilt) * static_cast<float>(M_PI) / 180.0f);
     float dirZ = -cosf(player.angleY * static_cast<float>(M_PI) / 180.0f) * cosf((player.angleX + tilt) * static_cast<float>(M_PI) / 180.0f);
@@ -337,12 +371,12 @@ void displayGameWindow(void) {
         player.x + dirX, player.y + dirY, player.z + dirZ,
         0.0f, 1.0f, 0.0f);
 
-    // ì¹´ë©”ë¼ í‹¸íŠ¸ ê°ì‡ 
-    cameraTiltIntensity *= 0.9f; // ê°ì‡ ìœ¨
-
-    // ë°”ë‹¥ ê·¸ë¦¬ê¸°
+    // Ä«¸Ş¶ó Æ¿Æ® °¨¼è
+    cameraTiltIntensity *= 0.9f; // °¨¼èÀ²
+    
+    // ¹Ù´Ú ±×¸®±â
     glPushMatrix();
-    glColor3f(0.2f, 0.2f, 0.2f); // ë°”ë‹¥ì€ ì–´ë‘ìš´ íšŒìƒ‰
+    glColor3f(0.2f, 0.2f, 0.2f); // ¹Ù´ÚÀº ¾îµÎ¿î È¸»ö
     glBegin(GL_QUADS);
     glNormal3f(0.0f, 1.0f, 0.0f);
     glVertex3f(0.0f, 0.0f, 0.0f);
@@ -352,13 +386,13 @@ void displayGameWindow(void) {
     glEnd();
     glPopMatrix();
 
-    // ë¯¸ë¡œ ë²½ ê·¸ë¦¬ê¸°
-    glColor3f(0.8f, 0.8f, 0.8f); // ë²½ì€ ë°ì€ íšŒìƒ‰
+    // ¹Ì·Î º® ±×¸®±â
+    glColor3f(0.8f, 0.8f, 0.8f); // º®Àº ¹àÀº È¸»ö
     float wallHeight = 2.0f;
 
     for (int i = 0; i < maze.mazeData.size(); ++i) {
         for (int j = 0; j < maze.mazeData[0].size(); ++j) {
-            if (maze.mazeData[i][j] == 1) { // ë²½ ì…€
+            if (maze.mazeData[i][j] == 1) { // º® ¼¿
                 glPushMatrix();
                 glTranslatef((j + 0.5f) * maze.cellSize, wallHeight / 2.0f, (i + 0.5f) * maze.cellSize);
                 glScalef(maze.cellSize, wallHeight, maze.cellSize);
@@ -368,40 +402,58 @@ void displayGameWindow(void) {
         }
     }
 
-    // ì•„ì´í…œ ë Œë”ë§
+    // ¾ÆÀÌÅÛ ·»´õ¸µ
     for (const auto& item : items) {
+        if (item.get) continue; // È¹µæÇÑ ¾ÆÀÌÅÛÀº ·»´õ¸µµÇÁö ¾ÊÀ½
+
         glPushMatrix();
-        // ì•„ì´í…œì˜ ê·¸ë¦¬ë“œ ìœ„ì¹˜ì— ëŒ€í•œ ì›”ë“œ ì¢Œí‘œ
+        // ¾ÆÀÌÅÛÀÇ ±×¸®µå À§Ä¡¿¡ ´ëÇÑ ¿ùµå ÁÂÇ¥
         float baseX = (item.gridX + 0.5f) * maze.cellSize;
         float baseZ = (item.gridZ + 0.5f) * maze.cellSize;
-        float y = 0.3f; // ëª¨ë¸ì˜ y ìœ„ì¹˜ë¥¼ ë‚®ì¶° ë°”ë‹¥ê³¼ ê²¹ì¹˜ì§€ ì•Šë„ë¡ í•¨
+        float y = 0.3f; // ¸ğµ¨ÀÇ y À§Ä¡¸¦ ³·Ãç ¹Ù´Ú°ú °ãÄ¡Áö ¾Êµµ·Ï ÇÔ
 
-        // ì™•ë³µ ìš´ë™ ì ìš© (yì¶• ë°©í–¥ìœ¼ë¡œ ì´ë™)
+        // ¿Õº¹ ¿îµ¿ Àû¿ë (yÃà ¹æÇâÀ¸·Î ÀÌµ¿)
         float oscillateY = item.oscillateOffset;
         glTranslatef(baseX, y + oscillateY, baseZ);
 
-        // íšŒì „ ì ìš©
+        // È¸Àü Àû¿ë
         glRotatef(item.rotationAngle, 0.0f, 1.0f, 0.0f);
 
-        // ëª¨ë¸ í¬ê¸° ì¡°ì •
+        // ¸ğµ¨ Å©±â Á¶Á¤
         glScalef(1.0f, 1.0f, 1.0f);
 
-        // ì¡°ëª… í™œì„±í™”
+        // Á¶¸í È°¼ºÈ­
         glEnable(GL_LIGHTING);
 
-        // ëª¨ë¸ ìƒ‰ìƒ ì„¤ì • (ì—°í•œ í•˜ëŠ˜ìƒ‰)
-        glColor3f(0.53f, 0.81f, 0.98f); // ì—°í•œ í•˜ëŠ˜ìƒ‰
+        // ¸ğµ¨ »ö»ó ¼³Á¤ (¿¬ÇÑ ÇÏ´Ã»ö)
+        glColor3f(0.53f, 0.81f, 0.98f); // ¿¬ÇÑ ÇÏ´Ã»ö
 
-        // ëª¨ë¸ ë Œë”ë§
+        // ¸ğµ¨ ·»´õ¸µ
         renderModel();
 
         glPopMatrix();
     }
 
+    // È¹µæÇÑ ¾ÆÀÌÅÛ °³¼ö ÅØ½ºÆ®
+    std::ostringstream oss;
+    oss << "Item : " << game.countItem << " / " << items.size();
+    renderText(10.0f, glutGet(GLUT_WINDOW_HEIGHT) - 30.0f, oss.str());
+
+    // Å¬¸®¾î È­¸é
+    if (game.isClear) {
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // »ö»ó°ú ±íÀÌ ¹öÆÛ ÃÊ±âÈ­
+        glLoadIdentity(); // ±âÁ¸ ¸ğµ¨ºä Çà·Ä ÃÊ±âÈ­
+
+        renderText(glutGet(GLUT_WINDOW_WIDTH) / 2 - 50, glutGet(GLUT_WINDOW_HEIGHT) / 2, "Game Clear!", GLUT_BITMAP_TIMES_ROMAN_24);
+        glutSwapBuffers();
+        return;
+    }
+
     glutSwapBuffers();
 }
 
-// ê²Œì„ ìœˆë„ìš°ì˜ í¬ê¸°ê°€ ë³€ê²½ë  ë•Œ í˜¸ì¶œë˜ëŠ” í•¨ìˆ˜
+// °ÔÀÓ À©µµ¿ìÀÇ Å©±â°¡ º¯°æµÉ ¶§ È£ÃâµÇ´Â ÇÔ¼ö
 void reshapeGameWindow(int newWidth, int newHeight) {
     if (newHeight == 0) newHeight = 1;
     float aspectRatio = static_cast<float>(newWidth) / static_cast<float>(newHeight);
@@ -414,26 +466,26 @@ void reshapeGameWindow(int newWidth, int newHeight) {
     glMatrixMode(GL_MODELVIEW);
 }
 
-// ê²Œì„ì—ì„œ í‚¤ë³´ë“œ ì…ë ¥ì„ ì²˜ë¦¬í•˜ëŠ” í•¨ìˆ˜
+// °ÔÀÓ¿¡¼­ Å°º¸µå ÀÔ·ÂÀ» Ã³¸®ÇÏ´Â ÇÔ¼ö
 void keyboardGame(unsigned char key, int x, int y) {
-    if (key == 27) { // ESC í‚¤ë¥¼ ëˆ„ë¥´ë©´ í”„ë¡œê·¸ë¨ ì¢…ë£Œ
+    if (key == 27) { // ESC Å°¸¦ ´©¸£¸é ÇÁ·Î±×·¥ Á¾·á
         exit(0);
     }
-    else if (key == ' ') { // ìŠ¤í˜ì´ìŠ¤ë°”ë¥¼ ëˆŒë €ì„ ë•Œ ì í”„
+    else if (key == ' ') { // ½ºÆäÀÌ½º¹Ù¸¦ ´­·¶À» ¶§ Á¡ÇÁ
         if (player.onGround) {
-            player.verticalVelocity = 0.10f; // ì í”„ ì´ˆê¸° ì†ë„
+            player.verticalVelocity = 0.10f; // Á¡ÇÁ ÃÊ±â ¼Óµµ
             player.onGround = false;
-            cameraTiltIntensity = 2.0f; // ì í”„ ì‹œ ì¹´ë©”ë¼ í‹¸íŠ¸
+            cameraTiltIntensity = 2.0f; // Á¡ÇÁ ½Ã Ä«¸Ş¶ó Æ¿Æ®
         }
     }
 }
 
-// í‚¤ë³´ë“œì—ì„œ í‚¤ê°€ ë†“ì˜€ì„ ë•Œ í˜¸ì¶œë˜ëŠ” í•¨ìˆ˜
+// Å°º¸µå¿¡¼­ Å°°¡ ³õ¿´À» ¶§ È£ÃâµÇ´Â ÇÔ¼ö
 void keyboardUp(unsigned char key, int x, int y) {
-    // ì¶”ê°€ì ì¸ ë™ì‘ì´ í•„ìš”í•˜ë©´ êµ¬í˜„
+    // Ãß°¡ÀûÀÎ µ¿ÀÛÀÌ ÇÊ¿äÇÏ¸é ±¸Çö
 }
 
-// ë§ˆìš°ìŠ¤ ì›€ì§ì„ì„ ì²˜ë¦¬í•˜ëŠ” í•¨ìˆ˜
+// ¸¶¿ì½º ¿òÁ÷ÀÓÀ» Ã³¸®ÇÏ´Â ÇÔ¼ö
 void passiveMouseMotion(int x, int y) {
     static bool warpPointer = false;
     if (warpPointer) {
@@ -457,7 +509,7 @@ void passiveMouseMotion(int x, int y) {
     glutWarpPointer(centerX, centerY);
 }
 
-// ê²Œì„ ë¡œì§ ì—…ë°ì´íŠ¸ í•¨ìˆ˜
+// °ÔÀÓ ·ÎÁ÷ ¾÷µ¥ÀÌÆ® ÇÔ¼ö
 void update(int value) {
     float speed = 0.05f;
 
@@ -470,10 +522,10 @@ void update(int value) {
     float moveX = 0.0f;
     float moveZ = 0.0f;
 
-    // ì´ë™ ì¤‘ì¸ì§€ í™•ì¸í•˜ê¸° ìœ„í•œ ë³€ìˆ˜
+    // ÀÌµ¿ ÁßÀÎÁö È®ÀÎÇÏ±â À§ÇÑ º¯¼ö
     bool isMoving = false;
 
-    // W, A, S, D í‚¤ë¥¼ ì‚¬ìš©í•œ ì´ë™
+    // W, A, S, D Å°¸¦ »ç¿ëÇÑ ÀÌµ¿
     if (keys['w'] || keys['W']) {
         moveX += dirX * speed;
         moveZ += dirZ * speed;
@@ -495,12 +547,12 @@ void update(int value) {
         isMoving = true;
     }
 
-    // ì´ë™ ì¤‘ì´ë©´ ì¹´ë©”ë¼ í‹¸íŠ¸ ì¶”ê°€
+    // ÀÌµ¿ ÁßÀÌ¸é Ä«¸Ş¶ó Æ¿Æ® Ãß°¡
     if (isMoving && player.onGround) {
-        cameraTiltIntensity = 0.5f; // ì´ë™ ì‹œ ì¹´ë©”ë¼ í‹¸íŠ¸
+        cameraTiltIntensity = 0.5f; // ÀÌµ¿ ½Ã Ä«¸Ş¶ó Æ¿Æ®
     }
 
-    // ì¶•ë³„ë¡œ ì´ë™ ë° ì¶©ëŒ ê²€ì‚¬
+    // Ãàº°·Î ÀÌµ¿ ¹× Ãæµ¹ °Ë»ç
     float tentativeX = player.x + moveX;
     if (!isColliding(tentativeX, player.z)) {
         player.x = tentativeX;
@@ -511,27 +563,57 @@ void update(int value) {
         player.z = tentativeZ;
     }
 
-    // ì í”„ ë° ì¤‘ë ¥ ì²˜ë¦¬
+    // Á¡ÇÁ ¹× Áß·Â Ã³¸®
     if (!player.onGround) {
-        player.verticalVelocity -= 0.005f; // ì¤‘ë ¥ ê°€ì†ë„
+        player.verticalVelocity -= 0.005f; // Áß·Â °¡¼Óµµ
         player.y += player.verticalVelocity;
 
-        if (player.y <= 1.3f) { // ì§€ë©´ì— ë‹¿ì•˜ì„ ë•Œ
+        if (player.y <= 1.3f) { // Áö¸é¿¡ ´ê¾ÒÀ» ¶§
             player.y = 1.3f;
             player.verticalVelocity = 0.0f;
             player.onGround = true;
-            cameraTiltIntensity = 2.0f; // ì°©ì§€ ì‹œ ì¹´ë©”ë¼ í‹¸íŠ¸
+            cameraTiltIntensity = 2.0f; // ÂøÁö ½Ã Ä«¸Ş¶ó Æ¿Æ®
         }
     }
 
-    // ì• ë‹ˆë©”ì´ì…˜ ì—…ë°ì´íŠ¸ (ë¸íƒ€ íƒ€ì„ ê³„ì‚°)
+    // ¾ÆÀÌÅÛ È¹µæ È®ÀÎ
+    for (auto& item : items) {
+        if (item.get) continue;
+
+        // ¾ÆÀÌÅÛÀÇ ±×¸®µå À§Ä¡¿¡ ´ëÇÑ ¿ùµå ÁÂÇ¥
+        float itemX = (item.gridX + 0.5f) * maze.cellSize;
+        float itemZ = (item.gridZ + 0.5f) * maze.cellSize;
+
+        // ¾ÆÀÌÅÛ¿¡ °¡±îÀÌ °¡¸é È¹µæ
+        if (fabs(player.x - itemX) < 0.3f && fabs(player.z - itemZ) < 0.3f) {
+            std::cout << "¾ÆÀÌÅÛ È¹µæ" << std::endl;
+            item.get = true;
+            game.countItem++;
+        }
+    }
+
+    // Å¬¸®¾î È®ÀÎ
+    if (!game.isClear) {
+
+        // ¸ñÇ¥ ÁöÁ¡ÀÇ ±×¸®µå À§Ä¡¿¡ ´ëÇÑ ¿ùµå ÁÂÇ¥
+        float exitX = (game.exitgridX + 0.5f) * maze.cellSize;
+        float exitZ = (game.exitgridZ + 0.5f) * maze.cellSize;
+
+        // ¸ñÇ¥ ÁöÁ¡¿¡ °¡±îÀÌ °¡¸é Å¬¸®¾î
+        if (fabs(player.x - exitX) < 0.3f && fabs(player.z - exitZ) < 0.3f) {
+            std::cout << "Å¬¸®¾î" << std::endl;
+            game.isClear = true;
+        }
+    }
+
+    // ¾Ö´Ï¸ŞÀÌ¼Ç ¾÷µ¥ÀÌÆ® (µ¨Å¸ Å¸ÀÓ °è»ê)
     static int lastTime = glutGet(GLUT_ELAPSED_TIME);
     int currentTime = glutGet(GLUT_ELAPSED_TIME);
-    float deltaTime = (currentTime - lastTime) / 1000.0f; // ì´ˆ ë‹¨ìœ„
+    float deltaTime = (currentTime - lastTime) / 1000.0f; // ÃÊ ´ÜÀ§
     lastTime = currentTime;
 
     animateItems(deltaTime);
 
     glutPostRedisplay();
-    glutTimerFunc(16, update, 0); // ì•½ 60 FPS
+    glutTimerFunc(16, update, 0); // ¾à 60 FPS
 }

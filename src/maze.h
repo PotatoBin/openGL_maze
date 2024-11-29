@@ -1,57 +1,66 @@
-// maze.h
+ï»¿// maze.h
 #ifndef MAZE_H
 #define MAZE_H
 
 #include <vector>
 #include <string>
 
-// Player ±¸Á¶Ã¼
+// Player êµ¬ì¡°ì²´
 struct Player {
-    float x, y, z;           // ÇÃ·¹ÀÌ¾îÀÇ À§Ä¡
-    float angleY, angleX;    // ½Ã¼± °¢µµ (Yaw, Pitch)
-    float verticalVelocity;  // YÃà ¼Óµµ (Á¡ÇÁ ¹× Áß·Â)
-    bool onGround;           // ÇÃ·¹ÀÌ¾î°¡ Áö¸é¿¡ ÀÖ´ÂÁö ¿©ºÎ
+    float x, y, z;           // í”Œë ˆì´ì–´ì˜ ìœ„ì¹˜
+    float angleY, angleX;    // ì‹œì„  ê°ë„ (Yaw, Pitch)
+    float verticalVelocity;  // Yì¶• ì†ë„ (ì í”„ ë° ì¤‘ë ¥)
+    bool onGround;           // í”Œë ˆì´ì–´ê°€ ì§€ë©´ì— ìˆëŠ”ì§€ ì—¬ë¶€
 
     Player()
-        : x(0.0f), y(0.5f), z(0.0f),
+        : x(10.0f), y(0.5f), z(10.0f),
         angleY(0.0f), angleX(0.0f),
         verticalVelocity(0.0f),
         onGround(true) {}
 };
 
-// Maze ±¸Á¶Ã¼
+// Game êµ¬ì¡°ì²´
+struct Game {
+    int exitgridX;
+    int exitgridZ;
+    int countItem;
+    bool isClear = false;
+};
+
+// Maze êµ¬ì¡°ì²´
 struct Maze {
     std::vector<std::vector<int>> mazeData;
     float cellSize;
 };
 
-// ¸ğµ¨ÀÇ Á¤Á¡°ú ¸éÀ» ÀúÀåÇÏ´Â ±¸Á¶Ã¼
+// ëª¨ë¸ì˜ ì •ì ê³¼ ë©´ì„ ì €ì¥í•˜ëŠ” êµ¬ì¡°ì²´
 struct Model {
-    std::vector<float> vertices; // x, y, z ¼ø¼­·Î ÀúÀå
-    std::vector<std::vector<int>> faces; // °¢ ¸éÀÇ Á¤Á¡ ÀÎµ¦½º
+    std::vector<float> vertices; // x, y, z ìˆœì„œë¡œ ì €ì¥
+    std::vector<std::vector<int>> faces; // ê° ë©´ì˜ ì •ì  ì¸ë±ìŠ¤
 };
 
-// ¾ÆÀÌÅÛ ±¸Á¶Ã¼
+// ì•„ì´í…œ êµ¬ì¡°ì²´
 struct Item {
-    int gridX, gridZ;          // ¹Ì·Î ±×¸®µå ÁÂÇ¥
-    float oscillateOffset;     // ¿Õº¹ ¿îµ¿ ¿ÀÇÁ¼Â
-    bool movingForward;        // ÀÌµ¿ ¹æÇâ (¾Õ/µÚ)
-    float rotationAngle;       // È¸Àü °¢µµ
+    int gridX, gridZ;          // ë¯¸ë¡œ ê·¸ë¦¬ë“œ ì¢Œí‘œ
+    float oscillateOffset;     // ì™•ë³µ ìš´ë™ ì˜¤í”„ì…‹
+    bool movingForward;        // ì´ë™ ë°©í–¥ (ì•/ë’¤)
+    float rotationAngle;       // íšŒì „ ê°ë„
+    bool get;                  // ì•„ì´í…œ íšë“ ì—¬ë¶€
 
     Item(int x, int z)
-        : gridX(x), gridZ(z), oscillateOffset(0.0f), movingForward(true), rotationAngle(0.0f) {}
+        : gridX(x), gridZ(z), oscillateOffset(0.0f), movingForward(true), rotationAngle(0.0f), get(false) {}
 };
 
-// ¿ÜºÎ Àü¿ª º¯¼ö ¼±¾ğ
+// ì™¸ë¶€ ì „ì—­ ë³€ìˆ˜ ì„ ì–¸
 extern Player player;
 extern Maze maze;
 extern Model model;
 extern std::vector<Item> items;
 
-// ÇÔ¼ö ¼±¾ğ
+// í•¨ìˆ˜ ì„ ì–¸
 void generateMaze();
 void initGame();
-void initGameModified(); // ¼öÁ¤µÈ ÃÊ±âÈ­ ÇÔ¼ö
+void initGameModified(); // ìˆ˜ì •ëœ ì´ˆê¸°í™” í•¨ìˆ˜
 void displayGameWindow();
 void reshapeGameWindow(int newWidth, int newHeight);
 void keyboardGame(unsigned char key, int x, int y);
